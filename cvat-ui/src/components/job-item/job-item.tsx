@@ -31,6 +31,16 @@ import CVATTag, { TagType } from 'components/common/cvat-tag';
 import JobActionsComponent from 'components/jobs-page/actions-menu';
 import { JobStageSelector, JobStateSelector } from './job-selectors';
 
+// A job made by splitting or sending back holds only some of the frames in its range,
+// so show how many it has rather than a range that overstates it
+function frameRangeText(job: Job): string {
+    const rangeSize = job.stopFrame - job.startFrame + 1;
+    if (job.frameCount && job.frameCount < rangeSize) {
+        return `${job.frameCount} frame${job.frameCount === 1 ? '' : 's'}`;
+    }
+    return `${job.startFrame}-${job.stopFrame}`;
+}
+
 function formatDate(value: Dayjs): string {
     return value.format('MMM Do YYYY HH:mm');
 }
@@ -270,9 +280,7 @@ function JobItem(props: Readonly<Props>): JSX.Element {
                                         <Icon component={FramesIcon} />
                                         <Text>{isAudioTask ? 'Time range: ' : 'Frame range: '}</Text>
                                         <Text type='secondary' className='cvat-job-item-frame-range'>
-                                            {isAudioTask ?
-                                                audioJobRange :
-                                                `${job.startFrame}-${job.stopFrame}`}
+                                            {isAudioTask ? audioJobRange : frameRangeText(job)}
                                         </Text>
                                     </Col>
                                 </Row>
