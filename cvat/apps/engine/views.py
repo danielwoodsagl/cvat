@@ -45,7 +45,7 @@ from rq.job import JobStatus as RQJobStatus
 
 import cvat.apps.dataset_manager as dm
 from cvat.apps.dataset_manager.serializers import DatasetFormatsSerializer
-from cvat.apps.engine import backup
+from cvat.apps.engine import backup, job_split
 from cvat.apps.engine.background import BackupImporter, DatasetImporter, TaskCreator
 from cvat.apps.engine.cache import (
     CacheTooLargeDataError,
@@ -131,6 +131,7 @@ from cvat.apps.engine.serializers import (
     IssueWriteSerializer,
     JobDataMetaWriteSerializer,
     JobReadSerializer,
+    JobReturnFlaggedFramesSerializer,
     JobValidationLayoutReadSerializer,
     JobValidationLayoutWriteSerializer,
     JobWriteSerializer,
@@ -2944,6 +2945,44 @@ class JobViewSet(
 
         response_serializer = JobValidationLayoutReadSerializer(db_job)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Accept a reviewed job and send only the flagged frames back",
+        description=textwrap.dedent("""\
+            Splits a job that is being reviewed. The frames that were flagged
+            (by default, those with unresolved issues), together with their annotations
+            and issues, move to a new annotation job in the same task. The original job
+            keeps the remaining frames and is set to the acceptance stage and completed state.
+
+            Only annotation jobs with shapes and tags are supported. Jobs containing tracks
+            or intervals, and consensus jobs, cannot be split.
+        """),
+        request=JobReturnFlaggedFramesSerializer,
+        responses={
+            "201": OpenApiResponse(JobReadSerializer, description="The new job"),
+            "400": OpenApiResponse(description="The job cannot be split"),
+        },
+    )
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_path="return_flagged_frames",
+        serializer_class=JobReturnFlaggedFramesSerializer,
+    )
+    def return_flagged_frames(self, request: ExtendedRequest, pk: int):
+        self.get_object()  # call check_object_permissions as well
+
+        request_serializer = JobReturnFlaggedFramesSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        db_new_job = job_split.return_flagged_frames(
+            pk,
+            frames=request_serializer.validated_data.get("frames"),
+            assignee_id=request_serializer.validated_data.get("assignee"),
+        )
+
+        response_serializer = JobReadSerializer(db_new_job, context={"request": request})
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
 @extend_schema(tags=["issues"])
