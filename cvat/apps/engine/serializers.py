@@ -1469,6 +1469,29 @@ class SimpleJobSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class JobReturnFlaggedFramesSerializer(serializers.Serializer):
+    frames = serializers.ListField(
+        child=serializers.IntegerField(min_value=0),
+        required=False,
+        allow_empty=False,
+        help_text=textwrap.dedent("""\
+            Task-relative numbers of the frames to send back.
+            By default, the frames of this job that have unresolved issues are used
+        """),
+    )
+    assignee = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="User ID to assign the new job to. By default, the new job is not assigned",
+    )
+
+    def validate_assignee(self, value: int | None) -> int | None:
+        if value is not None and not User.objects.filter(pk=value).exists():
+            raise serializers.ValidationError(f"User {value} does not exist")
+
+        return value
+
+
 class JobValidationLayoutWriteSerializer(serializers.Serializer):
     frame_selection_method = serializers.ChoiceField(
         choices=models.JobFrameSelectionMethod.choices(),

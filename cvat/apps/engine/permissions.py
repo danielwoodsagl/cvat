@@ -1018,13 +1018,17 @@ class JobPermission(OpenPolicyAgentPermission, DownloadExportedExtension):
             ("preview", "GET"): Scopes.VIEW,
             ("validation_layout", "GET"): Scopes.VIEW_VALIDATION_LAYOUT,
             ("validation_layout", "PATCH"): Scopes.UPDATE_VALIDATION_LAYOUT,
+            ("return_flagged_frames", "POST"): Scopes.UPDATE_STAGE,
             ("download_dataset", "GET"): DownloadExportedExtension.Scopes.DOWNLOAD_EXPORTED_FILE,
             # deprecated API
             ("dataset_export", "GET"): Scopes.EXPORT_DATASET,
         }[(view.action, request.method)]
 
         scopes = []
-        if scope == Scopes.UPDATE:
+        if view.action == "return_flagged_frames":
+            # Moves annotations to a new job as well as changing the stage of this one
+            scopes.extend([Scopes.UPDATE_STAGE, Scopes.UPDATE_ANNOTATIONS])
+        elif scope == Scopes.UPDATE:
             scopes.extend(
                 cls.get_per_field_update_scopes(
                     request,
