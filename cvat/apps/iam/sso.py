@@ -83,9 +83,18 @@ class EntraSocialAccountAdapter(DefaultSocialAccountAdapter):
         # from the configured Entra tenant and allowed domains get this far.
         User = get_user_model()
         existing = User.objects.filter(email__iexact=email).order_by("id").first()
+        if existing is None:
+            # Accounts made by an administrator before SSO often have the sign-in name as the
+            # username and no email. Link those too, but never an account with another email.
+            existing = User.objects.filter(
+                username__iexact=email.split("@", 1)[0], email=""
+            ).first()
         if existing is not None:
             if not existing.is_active:
                 raise _login_error("inactive")
+            if not existing.email:
+                existing.email = email
+                existing.save(update_fields=["email"])
             sociallogin.connect(request, existing)
 
     def is_open_for_signup(self, request, sociallogin):

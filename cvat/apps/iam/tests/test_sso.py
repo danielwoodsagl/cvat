@@ -97,6 +97,29 @@ class EntraSocialAccountAdapterTest(TestCase):
         self.assertEqual(User.objects.filter(email__iexact="chris.little@fleetscout.io").count(), 1)
         self.assertEqual(set(existing.groups.values_list("name", flat=True)), groups_before)
 
+    def test_links_to_existing_account_with_no_email_by_username(self):
+        existing = User.objects.create_user(username="gary.wright", email="", password="x")
+
+        with mock.patch.object(SocialAccount, "get_provider", return_value=mock.Mock(id="entra")):
+            self.adapter.pre_social_login(
+                self._request(), self._sociallogin("gary.wright@fleetscout.io")
+            )
+
+        existing.refresh_from_db()
+        self.assertEqual(existing.email, "gary.wright@fleetscout.io")
+        self.assertTrue(SocialAccount.objects.filter(user=existing, provider="entra").exists())
+
+    def test_does_not_link_by_username_when_the_account_has_another_email(self):
+        other = User.objects.create_user(
+            username="gary.wright", email="gary@somewhere-else.com", password="x"
+        )
+        sociallogin = self._sociallogin("gary.wright@fleetscout.io")
+
+        self.adapter.pre_social_login(self._request(), sociallogin)
+
+        self.assertFalse(sociallogin.is_existing)
+        self.assertFalse(SocialAccount.objects.filter(user=other).exists())
+
     def test_refuses_inactive_existing_account(self):
         User.objects.create_user(
             username="gone", email="gone@fleetscout.io", password="x", is_active=False
