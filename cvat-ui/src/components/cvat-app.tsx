@@ -33,6 +33,7 @@ import UploadFileStatusModal from 'components/common/upload-file-status-modal';
 import SelectCSUpdatingSchemeModal from 'components/update-linked-cs-modal/select-cs-updating-scheme-modal';
 
 import JobsPageComponent from 'components/jobs-page/jobs-page';
+import BoardPageComponent from 'components/board-page/board-page';
 import ModelsPageComponent from 'components/models-page/models-page';
 
 import TasksPageContainer from 'containers/tasks-page/tasks-page';
@@ -574,6 +575,7 @@ class CVATApplication extends React.PureComponent<CVATAppProps & RouteComponentP
                                         <Route exact path='/tasks/:tid/jobs/:jid' component={AnnotationPageContainer} />
                                         <Route exact path='/tasks/:tid/jobs/:jid/analytics' component={AnalyticsReportPage} />
                                         <Route exact path='/jobs' component={JobsPageComponent} />
+                                        <Route exact path='/board' component={BoardPageComponent} />
                                         <Route exact path='/cloudstorages' component={CloudStoragesPageComponent} />
                                         <Route
                                             exact
