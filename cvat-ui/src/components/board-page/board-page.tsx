@@ -23,8 +23,13 @@ function BoardPageComponent(): JSX.Element {
     const [search, setSearch] = useState<string | null>(null);
     const [pendingSearch, setPendingSearch] = useState('');
     const [userOptions, setUserOptions] = useState<string[]>([]);
+    const [projectId, setProjectId] = useState<number | null>(null);
+    const [projectOptions, setProjectOptions] = useState<{ value: number; label: string }[]>([]);
 
-    const filters = useMemo<BoardFilters>(() => ({ assignee, search }), [assignee, search]);
+    const filters = useMemo<BoardFilters>(
+        () => ({ assignee, search, projectId }),
+        [assignee, search, projectId],
+    );
 
     const searchUsers = async (value: string): Promise<void> => {
         try {
@@ -36,6 +41,23 @@ function BoardPageComponent(): JSX.Element {
             setUserOptions(users.map((user: { username: string }) => user.username));
         } catch (_error: unknown) {
             setUserOptions([]);
+        }
+    };
+
+    const searchProjects = async (value: string): Promise<void> => {
+        try {
+            const projects = await core.projects.get({
+                page: 1,
+                pageSize: 10,
+                sort: 'name',
+                ...(value ? { search: value } : {}),
+            });
+            setProjectOptions(projects.map((project: { id: number; name: string }) => ({
+                value: project.id,
+                label: project.name,
+            })));
+        } catch (_error: unknown) {
+            setProjectOptions([]);
         }
     };
 
@@ -53,6 +75,18 @@ function BoardPageComponent(): JSX.Element {
                         if (!event.target.value) setSearch(null);
                     }}
                     onSearch={(value: string) => setSearch(value || null)}
+                />
+                <Select
+                    showSearch
+                    allowClear
+                    className='cvat-board-project-select'
+                    placeholder='All projects'
+                    value={projectId ?? undefined}
+                    filterOption={false}
+                    onFocus={() => searchProjects('')}
+                    onSearch={searchProjects}
+                    onChange={(value?: number) => setProjectId(value ?? null)}
+                    options={projectOptions}
                 />
                 <Select
                     showSearch

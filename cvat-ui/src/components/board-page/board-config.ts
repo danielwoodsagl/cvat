@@ -52,6 +52,7 @@ export const BOARD_COLUMNS: BoardColumnConfig[] = [
 export interface BoardFilters {
     assignee: string | null;
     search: string | null;
+    projectId: number | null;
 }
 
 export function buildColumnFilter(column: BoardColumnConfig, filters: BoardFilters): string {
@@ -60,6 +61,10 @@ export function buildColumnFilter(column: BoardColumnConfig, filters: BoardFilte
     // Unassigned jobs have no assignee, so the assignee filter only applies to the other columns
     if (filters.assignee && column.key !== 'unassigned') {
         conditions.push({ '==': [{ var: 'assignee' }, filters.assignee] });
+    }
+
+    if (filters.projectId !== null) {
+        conditions.push({ '==': [{ var: 'project_id' }, filters.projectId] });
     }
 
     // cvat-core does not allow combining `filter` with `search`, so the task name match is a filter condition
