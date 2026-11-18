@@ -1,0 +1,126 @@
+// Copyright (C) CVAT.ai Corporation
+//
+// SPDX-License-Identifier: MIT
+
+// FleetScout fonts and the few global styles that need the brand. Fonts are bundled
+// rather than loaded from a font CDN, so the app makes no third-party requests.
+
+$fs-green: #009d4f;
+$fs-blue: #234e9c;
+$fs-navy: #0e1339;
+
+@font-face {
+    font-family: Montserrat;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./fonts/Montserrat-Regular.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: Montserrat;
+    font-weight: 500;
+    font-display: swap;
+    src: url('./fonts/Montserrat-Medium.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: Montserrat;
+    font-weight: 600 700;
+    font-display: swap;
+    src: url('./fonts/Montserrat-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: Poppins;
+    font-weight: 600;
+    font-display: swap;
+    src: url('./fonts/Poppins-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: Poppins;
+    font-weight: 700;
+    font-display: swap;
+    src: url('./fonts/Poppins-Bold.woff2') format('woff2');
+}
+
+body {
+    font-family: Montserrat, Lato, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+// Headings use Poppins, body text uses Montserrat (set through the antd theme)
+h1,
+h2,
+h3,
+h4,
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography h4,
+h1.ant-typography,
+h2.ant-typography,
+h3.ant-typography,
+h4.ant-typography,
+.cvat-board-title,
+.cvat-title {
+    font-family: Poppins, 'Proxima Nova', Montserrat, sans-serif;
+}
+
+// Navy header with the white FleetScout logo
+.cvat-header.ant-layout-header {
+    background: $fs-navy;
+}
+
+.cvat-header {
+    .ant-btn.ant-btn-link.cvat-header-button,
+    .ant-btn.ant-btn-link.cvat-header-button:hover {
+        color: #fff;
+    }
+
+    .cvat-left-header .ant-btn.cvat-header-button {
+        opacity: 0.75;
+        border-radius: 0;
+        border-bottom: 3px solid transparent;
+
+        &:hover {
+            opacity: 1;
+        }
+
+        &.cvat-active-header-button {
+            opacity: 1;
+            font-weight: 600;
+            border-bottom-color: $fs-green;
+        }
+    }
+
+    .cvat-header-menu-user-dropdown,
+    .cvat-header-menu-user-dropdown .ant-typography,
+    .cvat-header-menu-user-dropdown .anticon {
+        color: #fff;
+    }
+
+    .cvat-header-menu-user-dropdown .ant-typography.ant-typography-secondary,
+    .cvat-header-menu-user-dropdown-organization {
+        color: rgba(255, 255, 255, 70%);
+    }
+
+    .cvat-logo-icon {
+        max-width: 140px;
+    }
+}
+
+// Sign-in page: navy background and the real white logo. Stock CVAT recolours its logo
+// with a CSS filter, which must not be applied to the FleetScout logo.
+.cvat-signing-header .cvat-logo-icon {
+    filter: none;
+    max-width: 180px;
+}
+
+.cvat-signing-background {
+    display: none;
+}
+
+.ant-layout:has(> .cvat-signing-header),
+.ant-layout.cvat-signing-layout {
+    background: $fs-navy;
+}

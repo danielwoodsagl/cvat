@@ -34,6 +34,7 @@ import config from 'config';
 import { Organization } from 'cvat-core-wrapper';
 import CVATTooltip from 'components/common/cvat-tooltip';
 import CVATLogo from 'components/common/cvat-logo';
+import { BRAND } from 'branding/theme';
 import { switchSettingsModalVisible as switchSettingsModalVisibleAction } from 'actions/settings-actions';
 import { logoutAsync } from 'actions/auth-actions';
 import { shortcutsActions, registerComponentShortcuts } from 'actions/shortcuts-actions';
@@ -403,7 +404,7 @@ function HeaderComponent(props: Props): JSX.Element {
         <Layout.Header className='cvat-header'>
             <GlobalHotKeys keyMap={subKeyMap(componentShortcuts, keyMap)} handlers={handlers} />
             <div className='cvat-left-header'>
-                <CVATLogo />
+                <CVATLogo variant='light' />
                 <Button
                     className={getButtonClassName('projects')}
                     type='link'
@@ -503,19 +504,21 @@ function HeaderComponent(props: Props): JSX.Element {
                 ) : null}
             </div>
             <div className='cvat-right-header'>
-                <CVATTooltip overlay='Click to open repository'>
-                    <Button
-                        icon={<GithubOutlined />}
-                        size='large'
-                        className='cvat-open-repository-button cvat-header-button'
-                        type='link'
-                        href={GITHUB_URL}
-                        onClick={(event: React.MouseEvent): void => {
-                            event.preventDefault();
-                            window.open(GITHUB_URL, '_blank');
-                        }}
-                    />
-                </CVATTooltip>
+                {!BRAND.hideCvatPromotion && (
+                    <CVATTooltip overlay='Click to open repository'>
+                        <Button
+                            icon={<GithubOutlined />}
+                            size='large'
+                            className='cvat-open-repository-button cvat-header-button'
+                            type='link'
+                            href={GITHUB_URL}
+                            onClick={(event: React.MouseEvent): void => {
+                                event.preventDefault();
+                                window.open(GITHUB_URL, '_blank');
+                            }}
+                        />
+                    </CVATTooltip>
+                )}
                 <CVATTooltip overlay='Click to open guide'>
                     <Button
                         icon={<QuestionCircleOutlined />}

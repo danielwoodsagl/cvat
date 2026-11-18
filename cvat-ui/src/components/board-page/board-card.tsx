@@ -11,6 +11,10 @@ import dayjs from 'dayjs';
 import { Job } from 'cvat-core-wrapper';
 import JobStageStateBadges from 'components/job-item/job-status-visuals';
 
+function frameLabel(count: number): string {
+    return count === 1 ? '1 frame' : `${count} frames`;
+}
+
 interface Props {
     job: Job;
 }
@@ -39,7 +43,7 @@ function BoardCardComponent({ job }: Readonly<Props>): JSX.Element {
             </Text>
             <div className='cvat-board-card-meta'>
                 <Text type='secondary'>{`Job ${job.id}`}</Text>
-                <Text type='secondary'>{`${job.frameCount ?? job.stopFrame - job.startFrame + 1} frames`}</Text>
+                <Text type='secondary'>{frameLabel(job.frameCount ?? job.stopFrame - job.startFrame + 1)}</Text>
             </div>
             <div className='cvat-board-card-status'>
                 <JobStageStateBadges stage={job.stage} state={job.state} />

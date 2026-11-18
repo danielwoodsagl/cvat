@@ -3,15 +3,19 @@
 // SPDX-License-Identifier: MIT
 
 import React from 'react';
-import { useSelector } from 'react-redux';
-import { CombinedState } from 'reducers';
+import { BRAND } from '../../branding/theme';
 
-function CVATLogo(): JSX.Element {
-    const logo = useSelector((state: CombinedState) => state.about.server.logoURL);
+interface Props {
+    // 'light' is the white logo for dark backgrounds, 'dark' is for light backgrounds
+    variant?: 'light' | 'dark';
+}
+
+function CVATLogo({ variant = 'dark' }: Readonly<Props>): JSX.Element {
+    const src = variant === 'light' ? '/assets/fleetscout-logo-white.png' : '/assets/fleetscout-logo-dark.png';
 
     return (
         <div className='cvat-logo-icon'>
-            <img src={logo} alt='CVAT Logo' />
+            <img src={src} alt={`${BRAND.name} logo`} />
         </div>
     );
 }

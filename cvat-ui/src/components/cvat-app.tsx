@@ -90,6 +90,7 @@ import BulkProgress from './bulk-progress';
 import ProfilePageComponent from './profile-page/profile-page';
 import ServerUnavailableComponent from './server-unavailable/server-unavailable';
 import GitHubStarModal from './github-star-prompt/github-star-modal';
+import { BRAND } from '../branding/theme';
 
 interface CVATAppProps {
     loadFormats: () => void;
@@ -624,7 +625,7 @@ class CVATApplication extends React.PureComponent<CVATAppProps & RouteComponentP
                                     <SelectCSUpdatingSchemeModal />
                                     <SelectOrganizationModal />
                                     <BulkProgress />
-                                    {this.state.githubStarPromptVisible &&
+                                    {!BRAND.hideCvatPromotion && this.state.githubStarPromptVisible &&
                                         growth.data ? (
                                             <GitHubStarModal
                                                 open

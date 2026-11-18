@@ -193,6 +193,10 @@ module.exports = (env, argv = {}) => {
                     test: /\.(png|jpg|jpeg|gif|webp)$/i,
                     type: 'asset/resource',
                 },
+                {
+                    test: /\.woff2$/i,
+                    type: 'asset/resource',
+                },
             ],
             parser: {
                 javascript: {
