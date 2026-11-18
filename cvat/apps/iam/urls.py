@@ -34,9 +34,12 @@ urlpatterns = [
 ]
 
 if settings.IAM_TYPE == "BASIC":
-    urlpatterns += [
-        path("register", RegisterViewEx.as_view(), name=BASIC_REGISTER_PATH_NAME),
-    ]
+    # With sign-up disabled the route is left out, so it is also absent from the API schema
+    # and the UI hides its sign-up link and page
+    if settings.CVAT_ALLOW_SIGNUP:
+        urlpatterns += [
+            path("register", RegisterViewEx.as_view(), name=BASIC_REGISTER_PATH_NAME),
+        ]
 
     password_change_view_kwargs = {}
 

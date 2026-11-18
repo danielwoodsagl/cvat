@@ -20,7 +20,7 @@ from django.views.decorators.http import etag as django_etag
 from drf_spectacular.contrib.rest_auth import get_token_serializer_class
 from drf_spectacular.utils import extend_schema
 from rest_framework import views
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
 
 from cvat.apps.engine.log import ServerLogManager
@@ -77,6 +77,14 @@ class LoginViewEx(LoginView):
 
 
 class RegisterViewEx(RegisterView):
+    def create(self, request, *args, **kwargs):
+        if not settings.CVAT_ALLOW_SIGNUP:
+            raise PermissionDenied(
+                "Sign-up is disabled on this server. Ask an administrator for an account."
+            )
+
+        return super().create(request, *args, **kwargs)
+
     def get_response_data(self, user):
         serializer = self.get_serializer(user)
         return serializer.data

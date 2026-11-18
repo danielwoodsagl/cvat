@@ -780,6 +780,9 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
 
 ACCOUNT_ADAPTER = "cvat.apps.iam.adapters.DefaultAccountAdapterEx"
 
+# Set CVAT_ALLOW_SIGNUP=false for a closed instance, where accounts are created by an administrator
+CVAT_ALLOW_SIGNUP = to_bool(os.getenv("CVAT_ALLOW_SIGNUP", True))
+
 CVAT_HOST = os.getenv("CVAT_HOST", "localhost")
 CVAT_BASE_URL = os.getenv("CVAT_BASE_URL", f"http://{CVAT_HOST}:8080").rstrip("/")
 

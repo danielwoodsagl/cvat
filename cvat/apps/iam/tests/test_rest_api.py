@@ -70,6 +70,13 @@ class UserRegisterAPITestCase(ApiTestBase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data, data)
 
+    @override_settings(ACCOUNT_EMAIL_VERIFICATION="none", CVAT_ALLOW_SIGNUP=False)
+    def test_api_v2_user_register_refused_when_signup_disabled(self):
+        response = self._run_api_v2_user_register(self.user_data)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(User.objects.filter(username=self.user_data["username"]).exists())
+
     @override_settings(ACCOUNT_EMAIL_VERIFICATION="none")
     def test_api_v2_user_register_with_email_verification_none(self):
         """
