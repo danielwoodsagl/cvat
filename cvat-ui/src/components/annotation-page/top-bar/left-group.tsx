@@ -20,6 +20,8 @@ import { ShortcutScope } from 'utils/enums';
 import { subKeyMap } from 'utils/component-subkeymap';
 import GlobalHotKeys, { KeyMap } from 'utils/mousetrap-react';
 import { finishDrawAvailable } from 'utils/drawing';
+import NullFrameButton from 'components/job-workflow/null-frame-button';
+import ApproveJobButton from 'components/job-workflow/approve-job-button';
 import SaveAnnotationsButton from './save-annotations-button';
 
 interface Props {
@@ -123,6 +125,8 @@ function LeftGroup(props: Props): JSX.Element {
                         Redo
                     </Button>
                 </CVATTooltip>
+                <NullFrameButton />
+                <ApproveJobButton />
                 {includesDoneButton ? (
                     <CVATTooltip overlay={`Press "${drawShortcut}" to finish`}>
                         <Button type='link' className='cvat-annotation-header-done-button cvat-annotation-header-button' onClick={onFinishDraw}>

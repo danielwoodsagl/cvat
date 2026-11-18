@@ -132,6 +132,7 @@ from cvat.apps.engine.serializers import (
     JobDataMetaWriteSerializer,
     JobReadSerializer,
     JobReturnFlaggedFramesSerializer,
+    JobSplitSerializer,
     JobValidationLayoutReadSerializer,
     JobValidationLayoutWriteSerializer,
     JobWriteSerializer,
@@ -2982,6 +2983,54 @@ class JobViewSet(
         )
 
         response_serializer = JobReadSerializer(db_new_job, context={"request": request})
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        summary="Split a job between several people",
+        description=textwrap.dedent("""\
+            Divides the frames of a job in the annotation stage into equal, contiguous parts,
+            one per person. The job keeps the first part and is assigned to the first person.
+            Each other part becomes a new job in the same task, assigned to the next person,
+            with its annotations and issues.
+
+            Only annotation jobs with shapes and tags are supported. In an organisation,
+            everyone chosen must be an active member of it.
+        """),
+        request=JobSplitSerializer,
+        responses={
+            "201": OpenApiResponse(
+                JobReadSerializer(many=True), description="The jobs, in the order of the people"
+            ),
+            "400": OpenApiResponse(description="The job cannot be split"),
+        },
+    )
+    @action(detail=True, methods=["POST"], url_path="split", serializer_class=JobSplitSerializer)
+    def split(self, request: ExtendedRequest, pk: int):
+        db_job = self.get_object()  # call check_object_permissions as well
+
+        request_serializer = JobSplitSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        assignee_ids = request_serializer.validated_data["assignees"]
+
+        if db_job.organization_id is not None:
+            from cvat.apps.organizations.models import Membership
+
+            members = set(
+                Membership.objects.filter(
+                    organization_id=db_job.organization_id, user_id__in=assignee_ids, is_active=True
+                ).values_list("user_id", flat=True)
+            )
+            outsiders = [i for i in assignee_ids if i not in members]
+            if outsiders:
+                raise ValidationError(
+                    "These users are not members of the organization: {}".format(
+                        ", ".join(map(str, outsiders))
+                    )
+                )
+
+        jobs = job_split.split_between(pk, assignee_ids=assignee_ids)
+
+        response_serializer = JobReadSerializer(jobs, many=True, context={"request": request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 

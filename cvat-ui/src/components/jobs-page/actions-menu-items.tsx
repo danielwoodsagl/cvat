@@ -22,6 +22,7 @@ interface MenuItemsData {
     onMergeConsensusJob: (() => void) | null;
     onAddReplicas: (() => void) | null;
     onDistributeJobs: (() => void) | null;
+    onSplitJob: (() => void) | null;
     onDeleteJob: (() => void) | null;
     onGoToParent: (() => void) | null;
     onGoToReplicas: (() => void) | null;
@@ -42,6 +43,7 @@ enum MenuKeys {
     MERGE_SPECIFIC_CONSENSUS_JOBS = 'merge_specific_consensus_jobs',
     ADD_REPLICAS = 'add_replicas',
     DISTRIBUTE_JOBS = 'distribute_jobs',
+    SPLIT_JOB = 'split_job',
     IMPORT_JOB = 'import_job',
     BUG_TRACKER = 'bug_tracker',
     PROJECT = 'project',
@@ -65,6 +67,7 @@ export default function JobActionsItems(
         onMergeConsensusJob,
         onAddReplicas,
         onDistributeJobs,
+        onSplitJob,
         onDeleteJob,
         jobsToAct,
         onGoToParent,
@@ -181,6 +184,15 @@ export default function JobActionsItems(
         label: <CVATMenuEditLabel>{withCount('Assignee', MenuKeys.EDIT_ASSIGNEE)}</CVATMenuEditLabel>,
         disabled: isDisabled(MenuKeys.EDIT_ASSIGNEE),
     }, 80]);
+
+    if (onSplitJob) {
+        menuItems.push([{
+            key: MenuKeys.SPLIT_JOB,
+            onClick: onSplitJob,
+            label: 'Split between people…',
+            disabled: isDisabled(MenuKeys.SPLIT_JOB),
+        }, 84]);
+    }
 
     if (onDistributeJobs) {
         menuItems.push([{

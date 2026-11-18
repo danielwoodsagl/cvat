@@ -3274,6 +3274,49 @@ paths:
           description: The new job
         '400':
           description: The job cannot be split
+  /api/jobs/{id}/split:
+    post:
+      operationId: jobs_create_split
+      description: |
+        Divides the frames of a job in the annotation stage into equal, contiguous parts,
+        one per person. The job keeps the first part and is assigned to the first person.
+        Each other part becomes a new job in the same task, assigned to the next person,
+        with its annotations and issues.
+
+        Only annotation jobs with shapes and tags are supported. In an organisation,
+        everyone chosen must be an active member of it.
+      summary: Split a job between several people
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this job.
+        required: true
+      tags:
+      - jobs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobSplitRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - accessTokenAuth: []
+      - sessionAuth: []
+        csrfAuth: []
+        csrfHeaderAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/vnd.cvat+json:
+              schema:
+                $ref: '#/components/schemas/PaginatedJobReadList'
+          description: The jobs, in the order of the people
+        '400':
+          description: The job cannot be split
   /api/jobs/{id}/validation_layout:
     get:
       operationId: jobs_retrieve_validation_layout
@@ -9785,6 +9828,19 @@ components:
           nullable: true
           description: User ID to assign the new job to. By default, the new job is
             not assigned
+    JobSplitRequest:
+      type: object
+      properties:
+        assignees:
+          type: array
+          items:
+            type: integer
+          description: |
+            User IDs of the people to split the job between, in order. The job keeps the first
+            part of its frames and goes to the first person; each other person gets a new job
+          minItems: 2
+      required:
+      - assignees
     JobStage:
       enum:
       - annotation

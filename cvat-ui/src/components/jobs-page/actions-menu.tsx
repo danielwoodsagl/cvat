@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { shallowEqual } from 'utils/redux';
 import Dropdown from 'antd/lib/dropdown';
@@ -23,6 +23,7 @@ import { selectionActions } from 'actions/selection-actions';
 import UserSelector from 'components/task-page/user-selector';
 import { JobStageSelector, JobStateSelector } from 'components/job-item/job-selectors';
 import { makeKey } from 'reducers/consensus-reducer';
+import SplitJobModal from 'components/job-workflow/split-job-modal';
 import JobActionsItems from './actions-menu-items';
 
 interface Props {
@@ -56,6 +57,7 @@ function JobActionsComponent(
         currentOrganization: state.organizations.current,
     }), shallowEqual);
     const isBulkMode = selectedIds.length > 1;
+    const [splitting, setSplitting] = useState(false);
 
     let jobsToAct: Job[] = [jobInstance];
     if (selectedIds.includes(jobInstance.id)) {
@@ -238,6 +240,11 @@ function JobActionsComponent(
             onAddReplicas: jobsToAct.every((job) => job.type === JobType.ANNOTATION) ?
                 onAddReplicas : null,
             onDistributeJobs: jobsToAct.length > 1 && currentOrganization ? onDistributeJobs : null,
+            onSplitJob: (
+                !isBulkMode && jobInstance.type === JobType.ANNOTATION &&
+                jobInstance.stage === JobStage.ANNOTATION && jobInstance.parentJobId === null &&
+                !jobInstance.replicasCount
+            ) ? () => setSplitting(true) : null,
             onDeleteJob: (
                 jobInstance.type === JobType.GROUND_TRUTH || jobInstance.type === JobType.REPLICA
             ) ? onDeleteJob : null,
@@ -249,21 +256,30 @@ function JobActionsComponent(
     }
 
     return (
-        <Dropdown
-            destroyPopupOnHide
-            trigger={dropdownTrigger || ['click']}
-            open={dropdownOpen}
-            onOpenChange={onOpenChange}
-            className='job-actions-menu'
-            menu={{
-                selectable: false,
-                className: 'cvat-job-item-menu',
-                items: menuItems,
-                onClick: onMenuClick,
-            }}
-        >
-            {triggerElement}
-        </Dropdown>
+        <>
+            {splitting && (
+                <SplitJobModal
+                    job={jobInstance}
+                    onClose={() => setSplitting(false)}
+                    onDone={() => window.location.reload()}
+                />
+            )}
+            <Dropdown
+                destroyPopupOnHide
+                trigger={dropdownTrigger || ['click']}
+                open={dropdownOpen}
+                onOpenChange={onOpenChange}
+                className='job-actions-menu'
+                menu={{
+                    selectable: false,
+                    className: 'cvat-job-item-menu',
+                    items: menuItems,
+                    onClick: onMenuClick,
+                }}
+            >
+                {triggerElement}
+            </Dropdown>
+        </>
     );
 }
 

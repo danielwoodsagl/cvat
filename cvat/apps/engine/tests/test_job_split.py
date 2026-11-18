@@ -2,8 +2,13 @@
 #
 # SPDX-License-Identifier: MIT
 
+from unittest import mock
+
+from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase
 from rest_framework import status
 
+from cvat.apps.engine.job_split import even_chunks
 from cvat.apps.engine.models import (
     Issue,
     Job,
@@ -19,6 +24,8 @@ from cvat.apps.engine.models import (
 )
 from cvat.apps.engine.tests.test_rest_api import create_db_users, create_dummy_db_tasks
 from cvat.apps.engine.tests.utils import ApiTestBase, ForceLogin
+
+User = get_user_model()
 
 
 class JobReturnFlaggedFramesAPITestCase(ApiTestBase):
@@ -205,3 +212,143 @@ class JobReturnFlaggedFramesAPITestCase(ApiTestBase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(self._frames_of(second_job), {3})
         self.assertEqual(self._frames_of(Job.objects.get(pk=response.data["id"])), {4})
+
+
+class JobSplitBetweenPeopleAPITestCase(ApiTestBase):
+    @classmethod
+    def setUpTestData(cls):
+        create_db_users(cls)
+
+    def setUp(self):
+        super().setUp()
+
+        self.task = create_dummy_db_tasks(self)[0]
+        self.job = Job.objects.get(segment__task_id=self.task.id)
+        self.label = Label.objects.create(task=self.task, name="dent")
+
+        # A pre-label on each of frames 0, 40 and 99, and an issue on frame 70
+        for frame in (0, 40, 99):
+            LabeledShape.objects.create(
+                job=self.job,
+                label=self.label,
+                frame=frame,
+                group=0,
+                type="rectangle",
+                points=[1, 2, 3, 4],
+            )
+        Issue.objects.create(job=self.job, frame=70, position=[1, 2, 3, 4], owner=self.owner)
+
+        self.people = [self.owner.id, self.assignee.id, self.annotator.id]
+
+    def _post(self, user, assignees, job_id=None):
+        with ForceLogin(user, self.client):
+            return self.client.post(
+                f"/api/jobs/{job_id or self.job.id}/split",
+                data={"assignees": assignees},
+                format="json",
+            )
+
+    @staticmethod
+    def _frames_of(job: Job) -> list[int]:
+        job.segment.refresh_from_db()
+        start = job.segment.task.data.start_frame
+        return sorted(frame - start for frame in job.segment.frame_set)
+
+    def test_splits_frames_evenly_in_order_of_people(self):
+        response = self._post(self.admin, self.people)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        jobs = [Job.objects.get(pk=item["id"]) for item in response.data]
+        self.assertEqual(jobs[0].id, self.job.id)
+        self.assertEqual([j.assignee_id for j in jobs], self.people)
+        self.assertEqual([len(self._frames_of(j)) for j in jobs], [34, 33, 33])
+        self.assertEqual(self._frames_of(jobs[0]), list(range(0, 34)))
+        self.assertEqual(self._frames_of(jobs[1]), list(range(34, 67)))
+        self.assertEqual(self._frames_of(jobs[2]), list(range(67, 100)))
+        for job in jobs:
+            self.assertEqual(job.stage, StageChoice.ANNOTATION)
+            self.assertEqual(job.type, JobType.ANNOTATION)
+
+    def test_moves_pre_labels_and_issues_with_their_frames(self):
+        jobs = [item["id"] for item in self._post(self.admin, self.people).data]
+
+        def frames_of_shapes(job_id):
+            return set(LabeledShape.objects.filter(job_id=job_id).values_list("frame", flat=True))
+
+        self.assertEqual(frames_of_shapes(jobs[0]), {0})
+        self.assertEqual(frames_of_shapes(jobs[1]), {40})
+        self.assertEqual(frames_of_shapes(jobs[2]), {99})
+        self.assertEqual(Issue.objects.get(frame=70).job_id, jobs[2])
+
+    def test_owner_can_split(self):
+        self.assertEqual(self._post(self.owner, self.people).status_code, status.HTTP_201_CREATED)
+
+    def test_drops_the_original_jobs_cached_chunks(self):
+        # Chunks cached before the split hold the old frames; keeping them leaves the job
+        # unable to load its images
+        with (
+            mock.patch("cvat.apps.engine.cache.MediaCache.remove_segments_chunks") as remove,
+            mock.patch("cvat.apps.engine.cache.MediaCache.remove_segment_preview") as preview,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self._post(self.admin, self.people)
+
+        removed = remove.call_args.args[0]
+        self.assertTrue(removed)
+        self.assertTrue(all(item["db_segment"].id == self.job.segment_id for item in removed))
+        self.assertIn(0, {item["chunk_number"] for item in removed})
+        preview.assert_called_once()
+
+    def test_annotator_cannot_split(self):
+        response = self._post(self.annotator, self.people)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Job.objects.filter(segment__task_id=self.task.id).count(), 1)
+
+    def test_needs_at_least_two_people(self):
+        self.assertEqual(
+            self._post(self.admin, [self.owner.id]).status_code, status.HTTP_400_BAD_REQUEST
+        )
+
+    def test_rejects_the_same_person_twice(self):
+        response = self._post(self.admin, [self.owner.id, self.owner.id])
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rejects_unknown_people(self):
+        response = self._post(self.admin, [self.owner.id, 999999])
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_only_annotation_stage_jobs_can_be_split(self):
+        self.job.stage = StageChoice.VALIDATION
+        self.job.save()
+
+        response = self._post(self.admin, self.people)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Job.objects.filter(segment__task_id=self.task.id).count(), 1)
+
+    def test_rejects_more_people_than_frames(self):
+        first = self._post(self.admin, self.people).data[1]["id"]
+
+        # 33 frames left in this job, so 34 people is too many
+        many = [User.objects.create_user(username=f"extra{i}", password="x").id for i in range(34)]
+        response = self._post(self.admin, many, job_id=first)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_split_job_can_be_split_again(self):
+        second = self._post(self.admin, self.people).data[1]["id"]
+
+        response = self._post(self.admin, [self.owner.id, self.user.id], job_id=second)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        parts = [self._frames_of(Job.objects.get(pk=item["id"])) for item in response.data]
+        self.assertEqual(parts, [list(range(34, 51)), list(range(51, 67))])
+
+
+class EvenChunksTest(SimpleTestCase):
+    def test_sizes_differ_by_at_most_one_and_keep_order(self):
+        self.assertEqual(even_chunks(list(range(10)), 3), [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        self.assertEqual(even_chunks(list(range(200)), 4)[3], list(range(150, 200)))

@@ -1721,6 +1721,26 @@ class JobReturnFlaggedFramesSerializer(serializers.Serializer):
         return value
 
 
+class JobSplitSerializer(serializers.Serializer):
+    assignees = serializers.ListField(
+        child=serializers.IntegerField(),
+        min_length=2,
+        help_text=textwrap.dedent("""\
+            User IDs of the people to split the job between, in order. The job keeps the first
+            part of its frames and goes to the first person; each other person gets a new job
+        """),
+    )
+
+    def validate_assignees(self, value: list[int]) -> list[int]:
+        missing = set(value) - set(User.objects.filter(pk__in=value).values_list("id", flat=True))
+        if missing:
+            raise serializers.ValidationError(
+                "These users do not exist: {}".format(", ".join(map(str, sorted(missing))))
+            )
+
+        return value
+
+
 class JobValidationLayoutWriteSerializer(serializers.Serializer):
     frame_selection_method = serializers.ChoiceField(
         choices=models.JobFrameSelectionMethod.choices(),

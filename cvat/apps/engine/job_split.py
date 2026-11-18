@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Collection, Sequence
 
 from django.db import transaction
@@ -136,10 +137,34 @@ def _move_frames(
     "Restricts the original segment to the frames that were not flagged"
 
     db_segment = db_job.segment
+    old_frame_count = db_segment.frame_count
+
     db_segment.type = models.SegmentType.SPECIFIC_FRAMES
     db_segment.frames = sorted(map(frame_provider.get_abs_frame_number, kept))
     db_segment.chunks_updated_date = timezone.now()
     db_segment.save()
+
+    # Chunks cached before the change hold the old frames and are now older than
+    # chunks_updated_date, so they would be refused rather than rebuilt. Drop them, once the
+    # change is committed, so a request cannot re-cache the old frames in between.
+    transaction.on_commit(lambda: _drop_cached_chunks(db_segment, old_frame_count))
+
+
+def _drop_cached_chunks(db_segment: models.Segment, frame_count: int) -> None:
+    from cvat.apps.engine.cache import MediaCache
+
+    chunk_size = db_segment.task.data.chunk_size or 1
+    chunk_count = max(1, math.ceil(frame_count / chunk_size))
+
+    cache = MediaCache()
+    cache.remove_segment_preview(db_segment)
+    cache.remove_segments_chunks(
+        [
+            {"db_segment": db_segment, "chunk_number": chunk_number, "quality": quality}
+            for quality in (models.FrameQuality.COMPRESSED, models.FrameQuality.ORIGINAL)
+            for chunk_number in range(chunk_count)
+        ]
+    )
 
 
 def _create_job_for_frames(
@@ -148,6 +173,7 @@ def _create_job_for_frames(
     frames: Collection[int],
     frame_provider: TaskFrameProvider,
     assignee_id: int | None,
+    state: models.StateChoice = models.StateChoice.REJECTED,
 ) -> models.Job:
     db_task = db_job.segment.task
 
@@ -163,7 +189,7 @@ def _create_job_for_frames(
         segment=db_segment,
         type=models.JobType.ANNOTATION,
         stage=models.StageChoice.ANNOTATION,
-        state=models.StateChoice.REJECTED,
+        state=state,
         status=models.StatusChoice.ANNOTATION,
         assignee_id=assignee_id,
     )
@@ -193,3 +219,88 @@ def _mark_accepted(db_job: models.Job) -> None:
     db_job.state = models.StateChoice.COMPLETED
     db_job.status = models.StatusChoice.COMPLETED
     db_job.save(update_fields=["stage", "state", "status"])
+
+
+def _check_can_divide(db_job: models.Job) -> None:
+    if db_job.type != models.JobType.ANNOTATION:
+        raise ValidationError("Only annotation jobs can be split")
+
+    if db_job.stage != models.StageChoice.ANNOTATION:
+        raise ValidationError("Only jobs in the annotation stage can be split between people")
+
+    if db_job.parent_job_id is not None or db_job.child_jobs.exists():
+        raise ValidationError("Jobs that are part of a consensus set cannot be split")
+
+    if db_job.labeledtrack_set.exists() or db_job.labeledinterval_set.exists():
+        raise ValidationError(
+            "Jobs containing tracks or intervals cannot be split, "
+            "only jobs with shapes and tags are supported"
+        )
+
+
+def even_chunks(frames: Sequence[int], parts: int) -> list[list[int]]:
+    "Splits sorted frames into `parts` contiguous runs whose sizes differ by at most one"
+
+    size, extra = divmod(len(frames), parts)
+    chunks, start = [], 0
+    for i in range(parts):
+        end = start + size + (1 if i < extra else 0)
+        chunks.append(list(frames[start:end]))
+        start = end
+    return chunks
+
+
+@transaction.atomic
+def split_between(job_id: int, *, assignee_ids: Sequence[int]) -> list[models.Job]:
+    """
+    Divides an annotation job between several people.
+
+    The job's frames are split into equal, contiguous runs, one per person, in the order the
+    people are given. The original job keeps the first run and is assigned to the first person.
+    Every other run becomes a new job in the same task, with its annotations and issues.
+
+    Returns the jobs in assignee order, the original job first.
+    """
+
+    if len(assignee_ids) < 2:
+        raise ValidationError("Choose at least two people to split a job between")
+
+    if len(set(assignee_ids)) != len(assignee_ids):
+        raise ValidationError("Each person can only be chosen once")
+
+    db_job = (
+        models.Job.objects.select_for_update(of=("self",))
+        .select_related("segment", "segment__task", "segment__task__data")
+        .get(pk=job_id)
+    )
+
+    _check_can_divide(db_job)
+
+    frame_provider = TaskFrameProvider(db_job.segment.task)
+    frames = sorted(_job_rel_frames(db_job, frame_provider))
+    if len(frames) < len(assignee_ids):
+        raise ValidationError(
+            f"This job has {len(frames)} frames, too few to split between "
+            f"{len(assignee_ids)} people"
+        )
+
+    first, *rest = even_chunks(frames, len(assignee_ids))
+
+    _move_frames(db_job, flagged=[], kept=first, frame_provider=frame_provider)
+
+    jobs = [db_job]
+    for chunk, assignee_id in zip(rest, assignee_ids[1:]):
+        db_new_job = _create_job_for_frames(
+            db_job,
+            frames=chunk,
+            frame_provider=frame_provider,
+            assignee_id=assignee_id,
+            state=models.StateChoice.NEW,
+        )
+        _move_annotations_and_issues(db_job, db_new_job, chunk)
+        jobs.append(db_new_job)
+
+    db_job.update_assignee(assignee_ids[0])
+    db_job.save(update_fields=["assignee", "assignee_updated_date"])
+
+    return jobs
