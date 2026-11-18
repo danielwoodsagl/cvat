@@ -783,6 +783,48 @@ ACCOUNT_ADAPTER = "cvat.apps.iam.adapters.DefaultAccountAdapterEx"
 # Set CVAT_ALLOW_SIGNUP=false for a closed instance, where accounts are created by an administrator
 CVAT_ALLOW_SIGNUP = to_bool(os.getenv("CVAT_ALLOW_SIGNUP", True))
 
+# Single sign-on with Microsoft Entra ID (OpenID Connect). It is turned on when the tenant,
+# client ID and client secret are all set. Only people whose email domain is listed in
+# CVAT_SSO_ALLOWED_DOMAINS can sign in this way. It works whether or not CVAT_ALLOW_SIGNUP is on.
+CVAT_ENTRA_TENANT_ID = os.getenv("CVAT_ENTRA_TENANT_ID", "")
+CVAT_ENTRA_CLIENT_ID = os.getenv("CVAT_ENTRA_CLIENT_ID", "")
+CVAT_ENTRA_CLIENT_SECRET = os.getenv("CVAT_ENTRA_CLIENT_SECRET", "")
+CVAT_ENTRA_SSO_ENABLED = bool(
+    CVAT_ENTRA_TENANT_ID and CVAT_ENTRA_CLIENT_ID and CVAT_ENTRA_CLIENT_SECRET
+)
+CVAT_SSO_ALLOWED_DOMAINS = [
+    d.strip().lower() for d in os.getenv("CVAT_SSO_ALLOWED_DOMAINS", "").split(",") if d.strip()
+]
+# Role given to people the first time they sign in with SSO, and the organisation they join
+CVAT_SSO_DEFAULT_ROLE = os.getenv("CVAT_SSO_DEFAULT_ROLE", "worker")
+CVAT_SSO_ORGANIZATION = os.getenv("CVAT_SSO_ORGANIZATION", "")
+CVAT_SSO_ORGANIZATION_ROLE = os.getenv("CVAT_SSO_ORGANIZATION_ROLE", "worker")
+
+SOCIALACCOUNT_ADAPTER = "cvat.apps.iam.sso.EntraSocialAccountAdapter"
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_STORE_TOKENS = False
+SOCIALACCOUNT_PROVIDERS = {}
+
+if CVAT_ENTRA_SSO_ENABLED:
+    INSTALLED_APPS += ["allauth.socialaccount.providers.openid_connect"]
+    SOCIALACCOUNT_PROVIDERS["openid_connect"] = {
+        "OAUTH_PKCE_ENABLED": True,
+        "APPS": [
+            {
+                "provider_id": "entra",
+                "name": "Microsoft",
+                "client_id": CVAT_ENTRA_CLIENT_ID,
+                "secret": CVAT_ENTRA_CLIENT_SECRET,
+                "settings": {
+                    # A tenant-specific issuer, so only accounts in this tenant can sign in
+                    "server_url": f"https://login.microsoftonline.com/{CVAT_ENTRA_TENANT_ID}/v2.0",
+                    "token_auth_method": "client_secret_post",
+                },
+            }
+        ],
+    }
+
 CVAT_HOST = os.getenv("CVAT_HOST", "localhost")
 CVAT_BASE_URL = os.getenv("CVAT_BASE_URL", f"http://{CVAT_HOST}:8080").rstrip("/")
 

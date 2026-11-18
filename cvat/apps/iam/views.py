@@ -16,12 +16,15 @@ from dj_rest_auth.utils import jwt_encode
 from dj_rest_auth.views import LoginView
 from django.conf import settings
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import etag as django_etag
 from drf_spectacular.contrib.rest_auth import get_token_serializer_class
 from drf_spectacular.utils import extend_schema
-from rest_framework import views
+from rest_framework import serializers, views
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
 from cvat.apps.engine.log import ServerLogManager
 
@@ -168,3 +171,33 @@ class ConfirmEmailViewEx(ConfirmEmailView):
             return self.post(*args, **kwargs)
         except Http404:
             return HttpResponseRedirect(settings.INCORRECT_EMAIL_CONFIRMATION_URL)
+
+
+class SSOProviderSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    name = serializers.CharField()
+    login_url = serializers.CharField()
+
+
+@method_decorator(ensure_csrf_cookie, name="get")
+class SSOProvidersView(views.APIView):
+    """
+    Lists the single sign-on providers the sign-in page should offer. It also sets the CSRF
+    cookie, because starting an SSO sign-in is a POST that needs it.
+    """
+
+    serializer_class = None
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(
+        summary="List the single sign-on providers",
+        responses={"200": SSOProviderSerializer(many=True)},
+    )
+    def get(self, request):
+        providers = []
+        if settings.CVAT_ENTRA_SSO_ENABLED:
+            providers.append(
+                {"id": "entra", "name": "Microsoft", "login_url": "/api/auth/oidc/entra/login/"}
+            )
+        return Response(SSOProviderSerializer(providers, many=True).data)

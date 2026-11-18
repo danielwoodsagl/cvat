@@ -16,7 +16,13 @@ from django.urls.conf import include
 from django.utils.module_loading import import_string
 from django.views.generic import RedirectView
 
-from cvat.apps.iam.views import ConfirmEmailViewEx, LoginViewEx, RegisterViewEx, RulesView
+from cvat.apps.iam.views import (
+    ConfirmEmailViewEx,
+    LoginViewEx,
+    RegisterViewEx,
+    RulesView,
+    SSOProvidersView,
+)
 
 BASIC_LOGIN_PATH_NAME = "rest_login"
 BASIC_REGISTER_PATH_NAME = "rest_register"
@@ -31,7 +37,15 @@ urlpatterns = [
     ),
     path("logout", LogoutView.as_view(), name="rest_logout"),
     path("rules", RulesView.as_view(), name="rules"),
+    path("sso", SSOProvidersView.as_view(), name="sso_providers"),
 ]
+
+if settings.CVAT_ENTRA_SSO_ENABLED:
+    # Microsoft Entra sign-in: /api/auth/oidc/entra/login/ and .../login/callback/
+    urlpatterns += [
+        # allauth adds its own "oidc/" prefix (SOCIALACCOUNT_OPENID_CONNECT_URL_PREFIX)
+        path("", include("allauth.socialaccount.providers.openid_connect.urls")),
+    ]
 
 if settings.IAM_TYPE == "BASIC":
     # With sign-up disabled the route is left out, so it is also absent from the API schema

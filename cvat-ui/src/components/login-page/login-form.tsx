@@ -20,6 +20,7 @@ import {
 import CVATSigningInput, { CVATInputType } from 'components/signing-common/cvat-signing-input';
 import { CombinedState } from 'reducers';
 import { useAuthQuery, usePlugins } from 'utils/hooks';
+import SSOSignInComponent from './sso-sign-in';
 
 export interface LoginData {
     credential: string;
@@ -105,6 +106,7 @@ function LoginFormComponent(props: Props): JSX.Element {
             <Col>
                 <Title level={2}> Sign in </Title>
             </Col>
+            <SSOSignInComponent />
             <Form
                 className={`cvat-login-form ${credential ? 'cvat-login-form-extended' : ''}`}
                 form={form}

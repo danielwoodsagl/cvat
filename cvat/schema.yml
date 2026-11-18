@@ -475,6 +475,26 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/auth/sso:
+    get:
+      operationId: auth_list_sso
+      description: |-
+        Lists the single sign-on providers the sign-in page should offer. It also sets the CSRF
+        cookie, because starting an SSO sign-in is a POST that needs it.
+      summary: List the single sign-on providers
+      tags:
+      - auth
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/vnd.cvat+json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SSOProvider'
+          description: ''
   /api/cloudstorages:
     get:
       operationId: cloudstorages_list
@@ -13740,6 +13760,19 @@ components:
         * `Started` - Started
         * `Finished` - Finished
         * `Failed` - Failed
+    SSOProvider:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        login_url:
+          type: string
+      required:
+      - id
+      - login_url
+      - name
     ShapeType:
       enum:
       - rectangle
