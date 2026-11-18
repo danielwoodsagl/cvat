@@ -3212,6 +3212,48 @@ paths:
           description: 'No media-derived preview is available. The client should render
             a placeholder image. Only returned when the request opts in via `Prefer:
             handling=empty`.'
+  /api/jobs/{id}/return_flagged_frames:
+    post:
+      operationId: jobs_create_return_flagged_frames
+      description: |
+        Splits a job that is being reviewed. The frames that were flagged
+        (by default, those with unresolved issues), together with their annotations
+        and issues, move to a new annotation job in the same task. The original job
+        keeps the remaining frames and is set to the acceptance stage and completed state.
+
+        Only annotation jobs with shapes and tags are supported. Jobs containing tracks
+        or intervals, and consensus jobs, cannot be split.
+      summary: Accept a reviewed job and send only the flagged frames back
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this job.
+        required: true
+      tags:
+      - jobs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobReturnFlaggedFramesRequest'
+      security:
+      - tokenAuth: []
+      - accessTokenAuth: []
+      - sessionAuth: []
+        csrfAuth: []
+        csrfHeaderAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/vnd.cvat+json:
+              schema:
+                $ref: '#/components/schemas/JobRead'
+          description: The new job
+        '400':
+          description: The job cannot be split
   /api/jobs/{id}/validation_layout:
     get:
       operationId: jobs_retrieve_validation_layout
@@ -9707,6 +9749,22 @@ components:
       required:
       - issues
       - labels
+    JobReturnFlaggedFramesRequest:
+      type: object
+      properties:
+        frames:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+          description: |
+            Task-relative numbers of the frames to send back.
+            By default, the frames of this job that have unresolved issues are used
+        assignee:
+          type: integer
+          nullable: true
+          description: User ID to assign the new job to. By default, the new job is
+            not assigned
     JobStage:
       enum:
       - annotation
