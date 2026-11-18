@@ -39,7 +39,7 @@ function BoardCardComponent({ job }: Readonly<Props>): JSX.Element {
             </Text>
             <div className='cvat-board-card-meta'>
                 <Text type='secondary'>{`Job ${job.id}`}</Text>
-                <Text type='secondary'>{`${job.stopFrame - job.startFrame + 1} frames`}</Text>
+                <Text type='secondary'>{`${job.frameCount ?? job.stopFrame - job.startFrame + 1} frames`}</Text>
             </div>
             <div className='cvat-board-card-status'>
                 <JobStageStateBadges stage={job.stage} state={job.state} />
