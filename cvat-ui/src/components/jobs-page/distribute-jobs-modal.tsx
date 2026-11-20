@@ -30,6 +30,8 @@ const USERNAMES_PER_REQUEST = 50;
 
 interface Props {
     listedJobIds?: number[];
+    // Called once the jobs have been assigned
+    onDone?: () => void;
 }
 
 const searchUsers = _.debounce(
@@ -51,16 +53,41 @@ async function getUsersByUsernames(usernames: string[]): Promise<User[]> {
     return usernames.map((username) => usersByUsername[username]).filter(Boolean);
 }
 
-function distributeRoundRobin(jobs: Job[], users: User[]): { job: Job; assignee: User }[] {
+function imagesIn(job: Job): number {
+    return job.frameCount ?? (job.stopFrame - job.startFrame + 1);
+}
+
+// Gives each job to whoever has the fewest images so far, biggest jobs first,
+// so everyone ends up with about the same number of images to annotate
+export function distributeByImages(jobs: Job[], users: User[]): { job: Job; assignee: User }[] {
     if (!users.length) {
         return [];
     }
 
-    return jobs.map((job, idx) => ({ job, assignee: users[idx % users.length] }));
+    const images = users.map(() => 0);
+    const counts = users.map(() => 0);
+    const assigned = new Map<number, User>();
+    const biggestFirst = _.sortBy(jobs.map((job, idx) => ({ job, idx })), [
+        ({ job }) => -imagesIn(job),
+        ({ idx }) => idx,
+    ]);
+    for (const { job } of biggestFirst) {
+        let pick = 0;
+        for (let i = 1; i < users.length; i++) {
+            if (images[i] < images[pick] || (images[i] === images[pick] && counts[i] < counts[pick])) {
+                pick = i;
+            }
+        }
+        images[pick] += imagesIn(job);
+        counts[pick] += 1;
+        assigned.set(job.id, users[pick]);
+    }
+
+    return jobs.map((job) => ({ job, assignee: assigned.get(job.id) as User }));
 }
 
 function DistributeJobsModal(props: Readonly<Props>): JSX.Element {
-    const { listedJobIds } = props;
+    const { listedJobIds, onDone } = props;
     const dispatch = useDispatch();
     const { visible, jobs } = useSelector((state: CombinedState) => ({
         visible: state.jobs.distributeJobs.modalVisible,
@@ -78,7 +105,15 @@ function DistributeJobsModal(props: Readonly<Props>): JSX.Element {
         return idx === -1 ? Infinity : idx;
     }) : jobs;
 
-    const assignments = distributeRoundRobin(orderedJobs, users);
+    const assignments = distributeByImages(orderedJobs, users);
+    const totals = users.map((user) => {
+        const theirs = assignments.filter(({ assignee }) => assignee.id === user.id);
+        return {
+            user,
+            jobs: theirs.length,
+            images: _.sumBy(theirs, ({ job }) => imagesIn(job)),
+        };
+    });
 
     useEffect(() => {
         if (visible) {
@@ -111,6 +146,7 @@ function DistributeJobsModal(props: Readonly<Props>): JSX.Element {
                 ({ job, assignee }, idx, total) => (
                     `Assigning job #${job.id} to ${assignee.username} (${idx + 1}/${total})`
                 ),
+                onDone,
             )).catch((error: unknown) => {
                 dispatch(jobsActions.updateJobFailed(jobsToUpdate[0].job.id, error));
             });
@@ -204,6 +240,20 @@ function DistributeJobsModal(props: Readonly<Props>): JSX.Element {
                     <UploadOutlined />
                 </Space>
             </Upload.Dragger>
+            {totals.length > 0 && (
+                <>
+                    <Text strong>Each person gets</Text>
+                    <div className='cvat-distribute-jobs-totals'>
+                        {totals.map(({ user, jobs: jobCount, images }) => (
+                            <React.Fragment key={user.id}>
+                                <span>{user.username}</span>
+                                <span>{`${jobCount} job${jobCount === 1 ? '' : 's'}`}</span>
+                                <span>{`${images} image${images === 1 ? '' : 's'}`}</span>
+                            </React.Fragment>
+                        ))}
+                    </div>
+                </>
+            )}
             <Text strong>Preview</Text>
             <div className='cvat-distribute-jobs-preview'>
                 {assignments.map(({ job, assignee }) => (
@@ -211,6 +261,7 @@ function DistributeJobsModal(props: Readonly<Props>): JSX.Element {
                         <Link to={`/tasks/${job.taskId}/jobs/${job.id}`} target='_blank'>
                             {`Job #${job.id}`}
                         </Link>
+                        <Text type='secondary'>{`${imagesIn(job)} images`}</Text>
                         <ArrowRightOutlined />
                         <span>{assignee.username}</span>
                     </React.Fragment>

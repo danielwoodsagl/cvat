@@ -12,6 +12,7 @@ import Text from 'antd/lib/typography/Text';
 
 import { CombinedState } from 'reducers';
 import { getCore } from 'cvat-core-wrapper';
+import DistributeJobsModal from 'components/jobs-page/distribute-jobs-modal';
 import BoardColumnComponent from './board-column';
 import { BOARD_COLUMNS, BoardFilters } from './board-config';
 
@@ -163,6 +164,7 @@ function BoardPageComponent(): JSX.Element {
                     />
                 ))}
             </div>
+            <DistributeJobsModal onDone={reload} />
         </div>
     );
 }

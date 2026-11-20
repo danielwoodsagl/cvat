@@ -54,6 +54,12 @@
             align-items: center;
         }
 
+        .cvat-board-column-header-right {
+            display: inline-flex;
+            align-items: center;
+            gap: $grid-unit-size;
+        }
+
         .cvat-board-column-count {
             padding: 0 $grid-unit-size;
             border-radius: $grid-unit-size * 2;

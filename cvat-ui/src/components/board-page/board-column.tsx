@@ -12,6 +12,7 @@ import notification from 'antd/lib/notification';
 
 import { Job, getCore } from 'cvat-core-wrapper';
 import { JobPeople, getJobPeople } from 'components/job-workflow/api';
+import AllocateButton from './allocate-button';
 import BoardCardComponent from './board-card';
 import {
     BOARD_PAGE_SIZE, BoardColumnConfig, BoardFilters, buildColumnFilter,
@@ -81,7 +82,12 @@ function BoardColumnComponent({ column, filters, onChanged }: Readonly<Props>): 
         <div className={`cvat-board-column cvat-board-column-${column.key}`}>
             <div className='cvat-board-column-header'>
                 <Text strong>{column.title}</Text>
-                <span className='cvat-board-column-count'>{count}</span>
+                <span className='cvat-board-column-header-right'>
+                    {column.key === 'unassigned' && (
+                        <AllocateButton column={column} filters={filters} available={count} />
+                    )}
+                    <span className='cvat-board-column-count'>{count}</span>
+                </span>
             </div>
             <Text type='secondary' className='cvat-board-column-description'>{column.description}</Text>
             <div className='cvat-board-column-cards'>
