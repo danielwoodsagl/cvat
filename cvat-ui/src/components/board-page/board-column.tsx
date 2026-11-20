@@ -11,6 +11,7 @@ import Text from 'antd/lib/typography/Text';
 import notification from 'antd/lib/notification';
 
 import { Job, getCore } from 'cvat-core-wrapper';
+import { JobPeople, getJobPeople } from 'components/job-workflow/api';
 import BoardCardComponent from './board-card';
 import {
     BOARD_PAGE_SIZE, BoardColumnConfig, BoardFilters, buildColumnFilter,
@@ -21,10 +22,12 @@ const core = getCore();
 interface Props {
     column: BoardColumnConfig;
     filters: BoardFilters;
+    onChanged: () => void;
 }
 
-function BoardColumnComponent({ column, filters }: Readonly<Props>): JSX.Element {
+function BoardColumnComponent({ column, filters, onChanged }: Readonly<Props>): JSX.Element {
     const [jobs, setJobs] = useState<Job[]>([]);
+    const [people, setPeople] = useState<Record<number, JobPeople>>({});
     const [count, setCount] = useState(0);
     const [page, setPage] = useState(1);
     const [fetching, setFetching] = useState(false);
@@ -51,6 +54,12 @@ function BoardColumnComponent({ column, filters }: Readonly<Props>): JSX.Element
             setCount(total);
             setJobs((previous) => (nextPage === 1 ? [...result] : [...previous, ...result]));
             setPage(nextPage);
+
+            // The annotator and reviewer are extra; the cards still work without them
+            getJobPeople(result.map((job: Job) => job.id)).then((found) => {
+                if (current !== requestId.current) return;
+                setPeople((previous) => (nextPage === 1 ? found : { ...previous, ...found }));
+            }).catch(() => null);
         } catch (error: unknown) {
             if (current !== requestId.current) return;
 
@@ -76,7 +85,14 @@ function BoardColumnComponent({ column, filters }: Readonly<Props>): JSX.Element
             </div>
             <Text type='secondary' className='cvat-board-column-description'>{column.description}</Text>
             <div className='cvat-board-column-cards'>
-                {jobs.map((job: Job) => <BoardCardComponent key={job.id} job={job} />)}
+                {jobs.map((job: Job) => (
+                    <BoardCardComponent
+                        key={job.id}
+                        job={job}
+                        people={people[job.id] ?? null}
+                        onChanged={onChanged}
+                    />
+                ))}
                 {fetching && <Spin className='cvat-board-column-spinner' />}
                 {!fetching && jobs.length === 0 && (
                     <Text type='secondary' className='cvat-board-column-empty'>Nothing here</Text>

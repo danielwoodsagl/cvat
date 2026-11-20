@@ -10,6 +10,8 @@ import dayjs from 'dayjs';
 
 import { Job } from 'cvat-core-wrapper';
 import JobStageStateBadges from 'components/job-item/job-status-visuals';
+import { JobPeople } from 'components/job-workflow/api';
+import JobPeopleBadges from './job-people';
 
 function frameLabel(count: number): string {
     return count === 1 ? '1 frame' : `${count} frames`;
@@ -17,9 +19,11 @@ function frameLabel(count: number): string {
 
 interface Props {
     job: Job;
+    people: JobPeople | null;
+    onChanged: () => void;
 }
 
-function BoardCardComponent({ job }: Readonly<Props>): JSX.Element {
+function BoardCardComponent({ job, people, onChanged }: Readonly<Props>): JSX.Element {
     const history = useHistory();
 
     const onClick = useCallback((event: React.MouseEvent): void => {
@@ -49,8 +53,8 @@ function BoardCardComponent({ job }: Readonly<Props>): JSX.Element {
                 <JobStageStateBadges stage={job.stage} state={job.state} />
             </div>
             <div className='cvat-board-card-footer'>
-                <Text type='secondary'>{job.assignee ? job.assignee.username : 'Nobody'}</Text>
                 <Text type='secondary'>{dayjs(job.updatedDate).fromNow()}</Text>
+                <JobPeopleBadges jobId={job.id} people={people} onChanged={onChanged} />
             </div>
         </Card>
     );

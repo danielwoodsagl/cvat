@@ -1741,6 +1741,36 @@ class JobSplitSerializer(serializers.Serializer):
         return value
 
 
+class JobPeopleReadSerializer(serializers.Serializer):
+    job_id = serializers.IntegerField()
+    annotator = BasicUserSerializer(allow_null=True)
+    reviewer = BasicUserSerializer(allow_null=True)
+
+
+class JobPeopleWriteSerializer(serializers.Serializer):
+    annotator = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="User ID of the annotator. If the job is being annotated, it goes to them",
+    )
+    reviewer = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="User ID of the reviewer. If the job is being reviewed, it goes to them",
+    )
+
+
+class JobSendToReviewSerializer(serializers.Serializer):
+    reviewer = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text=textwrap.dedent("""\
+            User ID of the reviewer to hand the job to.
+            If omitted, the job's saved reviewer is used
+        """),
+    )
+
+
 class JobValidationLayoutWriteSerializer(serializers.Serializer):
     frame_selection_method = serializers.ChoiceField(
         choices=models.JobFrameSelectionMethod.choices(),

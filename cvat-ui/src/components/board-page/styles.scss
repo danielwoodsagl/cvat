@@ -96,5 +96,44 @@
         .cvat-board-card-status {
             margin: $grid-unit-size 0;
         }
+
+        .cvat-board-card-footer {
+            align-items: center;
+        }
+
+        .cvat-board-card-people {
+            display: inline-flex;
+            gap: $grid-unit-size * 0.5;
+            cursor: pointer;
+        }
+
+        .cvat-board-card-person {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .cvat-board-card-annotator {
+            color: #234e9c;
+            background: #dce6f7;
+        }
+
+        .cvat-board-card-reviewer {
+            color: #5b3a9e;
+            background: #e9e0f7;
+        }
+
+        .cvat-board-card-person-empty {
+            color: #8c8c8c;
+            background: transparent;
+            border: 1px dashed #bfbfbf;
+        }
+    }
+}
+
+.cvat-board-card-people-menu {
+    width: 260px;
+
+    .cvat-board-card-people-menu-row + .cvat-board-card-people-menu-row {
+        margin-top: $grid-unit-size;
     }
 }

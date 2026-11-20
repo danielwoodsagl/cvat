@@ -3198,6 +3198,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/RqId'
           description: Exporting is already in progress
+  /api/jobs/{id}/people:
+    patch:
+      operationId: jobs_partial_update_people
+      description: |
+        Sets who annotates and who reviews the job. If the job is in the annotation
+        stage, it goes to the new annotator; in the validation stage, to the new reviewer.
+      summary: Change the annotator or reviewer of a job
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this job.
+        required: true
+      tags:
+      - jobs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedJobPeopleWriteRequest'
+      security:
+      - tokenAuth: []
+      - accessTokenAuth: []
+      - sessionAuth: []
+        csrfAuth: []
+        csrfHeaderAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.cvat+json:
+              schema:
+                $ref: '#/components/schemas/JobPeopleRead'
+          description: ''
   /api/jobs/{id}/preview:
     get:
       operationId: jobs_retrieve_preview
@@ -3274,6 +3309,42 @@ paths:
           description: The new job
         '400':
           description: The job cannot be split
+  /api/jobs/{id}/send_to_review:
+    post:
+      operationId: jobs_create_send_to_review
+      description: |
+        Moves a job in the annotation stage to the validation stage and hands it to
+        the reviewer. Whoever had the job is kept as its annotator, so rejected frames
+        can go back to them. The job's annotator can do this as well as task staff.
+      summary: Send a job to review
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this job.
+        required: true
+      tags:
+      - jobs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobSendToReviewRequest'
+      security:
+      - tokenAuth: []
+      - accessTokenAuth: []
+      - sessionAuth: []
+        csrfAuth: []
+        csrfHeaderAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.cvat+json:
+              schema:
+                $ref: '#/components/schemas/JobRead'
+          description: ''
   /api/jobs/{id}/split:
     post:
       operationId: jobs_create_split
@@ -3392,6 +3463,181 @@ paths:
             application/vnd.cvat+json:
               schema:
                 $ref: '#/components/schemas/JobValidationLayoutRead'
+          description: ''
+  /api/jobs/people:
+    get:
+      operationId: jobs_list_people
+      summary: Get the annotator and reviewer of several jobs
+      parameters:
+      - name: X-Organization
+        in: header
+        description: |
+          Organization unique slug.
+          If omitted, results from all organizations available to the user are returned
+          (unfiltered). An empty value ("") selects the personal sandbox workspace only.
+          A non-empty value selects that organization.
+        schema:
+          type: string
+        allowEmptyValue: true
+      - name: assignee
+        in: query
+        description: A simple equality filter for the assignee field
+        schema:
+          type: string
+      - name: dimension
+        in: query
+        description: A simple equality filter for the dimension field
+        schema:
+          type: string
+          enum:
+          - 1d
+          - 2d
+          - 3d
+      - name: filter
+        required: false
+        in: query
+        description: |2-
+
+          JSON Logic filter. This filter can be used to perform complex filtering by grouping rules.
+
+          For example, using such a filter you can get all resources created by you:
+
+              - {"and":[{"==":[{"var":"owner"},"<user>"]}]}
+
+          Details about the syntax used can be found at the link: https://jsonlogic.com/
+
+           Available filter_fields: ['assignee', 'dimension', 'id', 'media_type', 'mode', 'parent_job_id', 'project_id', 'project_name', 'stage', 'state', 'task_id', 'task_name', 'type', 'updated_date'].
+        schema:
+          type: string
+      - in: query
+        name: ids
+        schema:
+          type: string
+        description: Comma-separated job IDs, at most 200
+        required: true
+      - name: media_type
+        in: query
+        description: A simple equality filter for the media_type field
+        schema:
+          type: string
+          enum:
+          - image
+          - point_cloud
+          - audio
+      - name: mode
+        in: query
+        description: A simple equality filter for the mode field
+        schema:
+          type: string
+          enum:
+          - annotation
+          - interpolation
+      - name: org
+        in: query
+        description: |
+          Organization unique slug.
+          If omitted, results from all organizations available to the user are returned
+          (unfiltered). An empty value ("") selects the personal sandbox workspace only.
+          A non-empty value selects that organization.
+        schema:
+          type: string
+        allowEmptyValue: true
+      - name: org_id
+        in: query
+        description: |
+          Organization unique id.
+          If omitted, results from all organizations available to the user are returned
+          (unfiltered). An empty value ("") selects the personal sandbox workspace only.
+          A positive integer selects that organization.
+        schema:
+          type: integer
+        allowEmptyValue: true
+      - name: parent_job_id
+        in: query
+        description: A simple equality filter for the parent_job_id field
+        schema:
+          type: integer
+      - name: project_id
+        in: query
+        description: A simple equality filter for the project_id field
+        schema:
+          type: integer
+      - name: project_name
+        in: query
+        description: A simple equality filter for the project_name field
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: 'A search term. Available search_fields: [''assignee'', ''project_name'',
+          ''task_name'']'
+        schema:
+          type: string
+      - name: sort
+        required: false
+        in: query
+        description: 'Which field to use when ordering the results. Available ordering_fields:
+          [''assignee'', ''dimension'', ''id'', ''media_type'', ''mode'', ''parent_job_id'',
+          ''project_id'', ''project_name'', ''stage'', ''state'', ''task_id'', ''task_name'',
+          ''type'', ''updated_date'']'
+        schema:
+          type: string
+      - name: stage
+        in: query
+        description: A simple equality filter for the stage field
+        schema:
+          type: string
+          enum:
+          - annotation
+          - validation
+          - acceptance
+      - name: state
+        in: query
+        description: A simple equality filter for the state field
+        schema:
+          type: string
+          enum:
+          - new
+          - in progress
+          - completed
+          - rejected
+      - name: task_id
+        in: query
+        description: A simple equality filter for the task_id field
+        schema:
+          type: integer
+      - name: task_name
+        in: query
+        description: A simple equality filter for the task_name field
+        schema:
+          type: string
+      - name: type
+        in: query
+        description: A simple equality filter for the type field
+        schema:
+          type: string
+          enum:
+          - annotation
+          - ground_truth
+          - replica
+      tags:
+      - jobs
+      security:
+      - tokenAuth: []
+      - accessTokenAuth: []
+      - sessionAuth: []
+        csrfAuth: []
+        csrfHeaderAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/vnd.cvat+json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobPeopleRead'
           description: ''
   /api/labels:
     get:
@@ -9682,6 +9928,23 @@ components:
         count:
           type: integer
           readOnly: true
+    JobPeopleRead:
+      type: object
+      properties:
+        job_id:
+          type: integer
+        annotator:
+          allOf:
+          - $ref: '#/components/schemas/BasicUser'
+          nullable: true
+        reviewer:
+          allOf:
+          - $ref: '#/components/schemas/BasicUser'
+          nullable: true
+      required:
+      - annotator
+      - job_id
+      - reviewer
     JobRead:
       type: object
       properties:
@@ -9828,6 +10091,15 @@ components:
           nullable: true
           description: User ID to assign the new job to. By default, the new job is
             not assigned
+    JobSendToReviewRequest:
+      type: object
+      properties:
+        reviewer:
+          type: integer
+          nullable: true
+          description: |
+            User ID of the reviewer to hand the job to.
+            If omitted, the job's saved reviewer is used
     JobSplitRequest:
       type: object
       properties:
@@ -11209,6 +11481,19 @@ components:
           items:
             type: integer
             minimum: 0
+    PatchedJobPeopleWriteRequest:
+      type: object
+      properties:
+        annotator:
+          type: integer
+          nullable: true
+          description: User ID of the annotator. If the job is being annotated, it
+            goes to them
+        reviewer:
+          type: integer
+          nullable: true
+          description: User ID of the reviewer. If the job is being reviewed, it goes
+            to them
     PatchedJobValidationLayoutWriteRequest:
       type: object
       properties:

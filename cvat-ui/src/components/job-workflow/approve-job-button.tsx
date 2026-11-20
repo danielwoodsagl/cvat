@@ -7,7 +7,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useHistory } from 'react-router';
 import Button from 'antd/lib/button';
 import Modal from 'antd/lib/modal';
-import Select from 'antd/lib/select';
 import Text from 'antd/lib/typography/Text';
 import notification from 'antd/lib/notification';
 import { CheckCircleOutlined } from '@ant-design/icons';
@@ -17,7 +16,10 @@ import { CombinedState } from 'reducers';
 import { saveAnnotationsAsync } from 'actions/annotation-actions';
 import { updateJobAsync } from 'actions/jobs-actions';
 import { Job, JobStage, JobState } from 'cvat-core-wrapper';
-import { UserOption, returnFlaggedFrames, searchUsers } from './api';
+import {
+    UserOption, getJobPeople, returnFlaggedFrames, setJobPeople,
+} from './api';
+import UserSelect from './user-select';
 
 function errorText(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
@@ -30,11 +32,9 @@ function ApproveJobButton(): JSX.Element | null {
     const history = useHistory();
     const job = useSelector((state: CombinedState) => state.annotation.job.instance) as Job | null;
     const issues = useSelector((state: CombinedState) => state.review.issues);
-    const me = useSelector((state: CombinedState) => state.auth.user);
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
-    const [options, setOptions] = useState<UserOption[]>([]);
-    const [annotator, setAnnotator] = useState<number | null>(null);
+    const [annotator, setAnnotator] = useState<UserOption | null>(null);
 
     const flaggedFrames = new Set(
         issues.filter((issue: any) => !issue.resolved).map((issue: any) => issue.frame),
@@ -42,14 +42,10 @@ function ApproveJobButton(): JSX.Element | null {
 
     useEffect(() => {
         if (!open || !job) return;
-        // The job's assignee is usually the annotator, unless the reviewer took it over
-        const previous = job.assignee && job.assignee.id !== me?.id ? job.assignee : null;
-        setAnnotator(previous ? previous.id : null);
-        searchUsers('').then((users) => {
-            const merged = previous && !users.some((u) => u.id === previous.id) ?
-                [{ id: previous.id, username: previous.username }, ...users] : users;
-            setOptions(merged);
-        }).catch(() => setOptions([]));
+        // Frames go back to whoever annotated the job, unless the reviewer picks someone else
+        getJobPeople([job.id])
+            .then((people) => setAnnotator(people[job.id]?.annotator ?? null))
+            .catch(() => setAnnotator(null));
     }, [open]);
 
     if (!job || job.stage !== JobStage.VALIDATION) {
@@ -66,7 +62,7 @@ function ApproveJobButton(): JSX.Element | null {
         try {
             await dispatch(saveAnnotationsAsync());
             if (flaggedFrames.size) {
-                const returned = await returnFlaggedFrames(job.id, annotator);
+                const returned = await returnFlaggedFrames(job.id, annotator ? annotator.id : null);
                 notification.success({
                     message: `Job ${job.id} approved`,
                     description: `${flaggedFrames.size} flagged frame${flaggedFrames.size === 1 ? '' : 's'} sent back as job ${returned.id}` +
@@ -74,6 +70,8 @@ function ApproveJobButton(): JSX.Element | null {
                     className: 'cvat-notification-approve-job-done',
                 });
             } else {
+                // Keep the reviewer on record once the job leaves the review stage
+                await setJobPeople(job.id, {}).catch(() => null);
                 await dispatch(updateJobAsync(job, { stage: JobStage.ACCEPTANCE, state: JobState.COMPLETED }));
                 notification.success({
                     message: `Job ${job.id} approved`,
@@ -123,18 +121,14 @@ function ApproveJobButton(): JSX.Element | null {
                             </Text>
                             <div style={{ marginTop: 12 }}>
                                 <Text strong>Send back to</Text>
-                                <Select
-                                    showSearch
-                                    allowClear
-                                    className='cvat-approve-job-annotator'
-                                    style={{ width: '100%', marginTop: 4 }}
-                                    placeholder='Choose the annotator (or leave unassigned)'
-                                    filterOption={false}
-                                    onSearch={(value) => searchUsers(value).then(setOptions).catch(() => null)}
-                                    value={annotator ?? undefined}
-                                    onChange={(value?: number) => setAnnotator(value ?? null)}
-                                    options={options.map((user) => ({ value: user.id, label: user.username }))}
-                                />
+                                <div style={{ marginTop: 4 }}>
+                                    <UserSelect
+                                        className='cvat-approve-job-annotator'
+                                        placeholder='Choose the annotator'
+                                        value={annotator}
+                                        onChange={setAnnotator}
+                                    />
+                                </div>
                             </div>
                         </>
                     ) : (

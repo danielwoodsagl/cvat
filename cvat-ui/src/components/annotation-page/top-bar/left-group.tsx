@@ -22,6 +22,7 @@ import GlobalHotKeys, { KeyMap } from 'utils/mousetrap-react';
 import { finishDrawAvailable } from 'utils/drawing';
 import NullFrameButton from 'components/job-workflow/null-frame-button';
 import ApproveJobButton from 'components/job-workflow/approve-job-button';
+import SendToReviewButton from 'components/job-workflow/send-to-review-button';
 import SaveAnnotationsButton from './save-annotations-button';
 
 interface Props {
@@ -126,6 +127,7 @@ function LeftGroup(props: Props): JSX.Element {
                     </Button>
                 </CVATTooltip>
                 <NullFrameButton />
+                <SendToReviewButton />
                 <ApproveJobButton />
                 {includesDoneButton ? (
                     <CVATTooltip overlay={`Press "${drawShortcut}" to finish`}>

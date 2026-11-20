@@ -13,6 +13,10 @@ update:state,Job,Sandbox,None,,PATCH,/jobs/{id},Admin,N/A
 update:state,Job,Sandbox,"Project:owner, Project:assignee, Task:owner, Task:assignee, Assignee",,PATCH,/jobs/{id},Worker,N/A
 update:state,Job,Organization,None,,PATCH,/jobs/{id},User,Maintainer
 update:state,Job,Organization,"Project:owner, Project:assignee, Task:owner, Task:assignee, Assignee",,PATCH,/jobs/{id},Worker,Worker
+send:review,Job,Sandbox,None,,POST,/jobs/{id}/send_to_review,Admin,N/A
+send:review,Job,Sandbox,"Project:owner, Project:assignee, Task:owner, Task:assignee, Assignee",,POST,/jobs/{id}/send_to_review,Worker,N/A
+send:review,Job,Organization,None,,POST,/jobs/{id}/send_to_review,User,Maintainer
+send:review,Job,Organization,"Project:owner, Project:assignee, Task:owner, Task:assignee, Assignee",,POST,/jobs/{id}/send_to_review,Worker,Worker
 update:assignee,Job,Sandbox,"None, Assignee",,PATCH,/jobs/{id},Admin,N/A
 update:assignee,Job,Sandbox,"Project:owner, Project:assignee, Task:owner, Task:assignee",,PATCH,/jobs/{id},Worker,N/A
 update:assignee,Job,Organization,"None, Assignee",,PATCH,/jobs/{id},User,Maintainer

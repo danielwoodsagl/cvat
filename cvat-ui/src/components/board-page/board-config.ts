@@ -53,6 +53,8 @@ export interface BoardFilters {
     assignee: string | null;
     search: string | null;
     projectId: number | null;
+    // Bumped to reload every column after a change on the board
+    version: number;
 }
 
 export function buildColumnFilter(column: BoardColumnConfig, filters: BoardFilters): string {

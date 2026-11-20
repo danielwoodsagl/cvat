@@ -5,6 +5,9 @@ import rego.v1
 import data.utils
 import data.organizations
 
+# Moves an annotated job to review. The annotator can do it, unlike other stage changes
+SEND_TO_REVIEW := "send:review"
+
 # input: {
 #     "scope": <
 #              "create"|
@@ -208,6 +211,19 @@ allow if {
         utils.UPDATE_STATE, utils.UPDATE_ANNOTATIONS, utils.DELETE_ANNOTATIONS,
         utils.IMPORT_ANNOTATIONS, utils.UPDATE_METADATA
     }
+    organizations.is_same_context_as_resource
+    utils.has_perm(utils.WORKER)
+    is_job_staff
+}
+
+allow if {
+    input.scope == SEND_TO_REVIEW
+    organizations.is_same_org_as_resource_with_perm(organizations.MAINTAINER)
+    utils.has_perm(utils.USER)
+}
+
+allow if {
+    input.scope == SEND_TO_REVIEW
     organizations.is_same_context_as_resource
     utils.has_perm(utils.WORKER)
     is_job_staff

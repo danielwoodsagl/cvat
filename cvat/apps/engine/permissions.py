@@ -922,6 +922,7 @@ class JobPermission(OpenPolicyAgentPermission, DownloadExportedExtension):
         VIEW_DATA = "view:data"
         VIEW_METADATA = "view:metadata"
         VIEW_VALIDATION_LAYOUT = "view:validation_layout"
+        SEND_TO_REVIEW = "send:review"
 
     @classmethod
     def create(
@@ -1029,6 +1030,9 @@ class JobPermission(OpenPolicyAgentPermission, DownloadExportedExtension):
             ("validation_layout", "PATCH"): Scopes.UPDATE_VALIDATION_LAYOUT,
             ("return_flagged_frames", "POST"): Scopes.UPDATE_STAGE,
             ("split", "POST"): Scopes.UPDATE_ASSIGNEE,
+            ("people_list", "GET"): Scopes.LIST,
+            ("people", "PATCH"): Scopes.UPDATE_ASSIGNEE,
+            ("send_to_review", "POST"): Scopes.SEND_TO_REVIEW,
             ("download_dataset", "GET"): DownloadExportedExtension.Scopes.DOWNLOAD_EXPORTED_FILE,
             # deprecated API
             ("dataset_export", "GET"): Scopes.EXPORT_DATASET,

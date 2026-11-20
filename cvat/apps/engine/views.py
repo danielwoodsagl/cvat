@@ -130,8 +130,11 @@ from cvat.apps.engine.serializers import (
     IssueReadSerializer,
     IssueWriteSerializer,
     JobDataMetaWriteSerializer,
+    JobPeopleReadSerializer,
+    JobPeopleWriteSerializer,
     JobReadSerializer,
     JobReturnFlaggedFramesSerializer,
+    JobSendToReviewSerializer,
     JobSplitSerializer,
     JobValidationLayoutReadSerializer,
     JobValidationLayoutWriteSerializer,
@@ -2976,11 +2979,22 @@ class JobViewSet(
         request_serializer = JobReturnFlaggedFramesSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
 
-        db_new_job = job_split.return_flagged_frames(
-            pk,
-            frames=request_serializer.validated_data.get("frames"),
-            assignee_id=request_serializer.validated_data.get("assignee"),
-        )
+        from cvat.apps.fs_workflow import people as job_people
+
+        db_job = Job.objects.get(pk=pk)
+        assignee_id = request_serializer.validated_data.get("assignee")
+        if assignee_id is None:
+            # Send the frames back to whoever annotated them
+            assignee_id = job_people.annotator_of(db_job)
+
+        with transaction.atomic():
+            job_people.remember_people(db_job)
+            db_new_job = job_split.return_flagged_frames(
+                pk,
+                frames=request_serializer.validated_data.get("frames"),
+                assignee_id=assignee_id,
+            )
+            job_people.copy_people(db_job, db_new_job)
 
         response_serializer = JobReadSerializer(db_new_job, context={"request": request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
@@ -3032,6 +3046,104 @@ class JobViewSet(
 
         response_serializer = JobReadSerializer(jobs, many=True, context={"request": request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        summary="Get the annotator and reviewer of several jobs",
+        parameters=[
+            OpenApiParameter(
+                "ids",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="Comma-separated job IDs, at most 200",
+            ),
+        ],
+        responses={"200": JobPeopleReadSerializer(many=True)},
+    )
+    @action(detail=False, methods=["GET"], url_path="people", pagination_class=None)
+    def people_list(self, request: ExtendedRequest):
+        from cvat.apps.fs_workflow import people as job_people
+
+        try:
+            ids = [int(i) for i in request.query_params.get("ids", "").split(",") if i.strip()]
+        except ValueError as ex:
+            raise ValidationError("ids must be a comma-separated list of job IDs") from ex
+        if len(ids) > 200:
+            raise ValidationError("Ask for at most 200 jobs at a time")
+
+        perm = JobPermission.create_scope_list(request)
+        db_jobs = perm.filter(Job.objects.select_related("assignee")).filter(id__in=ids)
+
+        people = job_people.get_people_for_jobs(db_jobs)
+        data = [
+            {"job_id": job_id, "annotator": p.annotator, "reviewer": p.reviewer}
+            for job_id, p in people.items()
+        ]
+        return Response(JobPeopleReadSerializer(data, many=True, context={"request": request}).data)
+
+    @extend_schema(
+        summary="Change the annotator or reviewer of a job",
+        description=textwrap.dedent("""\
+            Sets who annotates and who reviews the job. If the job is in the annotation
+            stage, it goes to the new annotator; in the validation stage, to the new reviewer.
+        """),
+        request=JobPeopleWriteSerializer,
+        responses={"200": JobPeopleReadSerializer},
+    )
+    @action(
+        detail=True, methods=["PATCH"], url_path="people", serializer_class=JobPeopleWriteSerializer
+    )
+    def people(self, request: ExtendedRequest, pk: int):
+        from cvat.apps.fs_workflow import people as job_people
+
+        self.get_object()  # call check_object_permissions as well
+
+        request_serializer = JobPeopleWriteSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        changes = {
+            f"{field}_id": request_serializer.validated_data[field]
+            for field in ("annotator", "reviewer")
+            if field in request_serializer.validated_data
+        }
+
+        db_job = job_people.set_people(pk, **changes)
+        p = job_people.get_people(db_job)
+        return Response(
+            JobPeopleReadSerializer(
+                {"job_id": db_job.id, "annotator": p.annotator, "reviewer": p.reviewer},
+                context={"request": request},
+            ).data
+        )
+
+    @extend_schema(
+        summary="Send a job to review",
+        description=textwrap.dedent("""\
+            Moves a job in the annotation stage to the validation stage and hands it to
+            the reviewer. Whoever had the job is kept as its annotator, so rejected frames
+            can go back to them. The job's annotator can do this as well as task staff.
+        """),
+        request=JobSendToReviewSerializer,
+        responses={"200": JobReadSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_path="send_to_review",
+        serializer_class=JobSendToReviewSerializer,
+    )
+    def send_to_review(self, request: ExtendedRequest, pk: int):
+        from cvat.apps.fs_workflow import people as job_people
+
+        self.get_object()  # call check_object_permissions as well
+
+        request_serializer = JobSendToReviewSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        kwargs = {}
+        if "reviewer" in request_serializer.validated_data:
+            kwargs["reviewer_id"] = request_serializer.validated_data["reviewer"]
+
+        db_job = job_people.send_to_review(pk, sent_by_id=request.user.id, **kwargs)
+        return Response(JobReadSerializer(db_job, context={"request": request}).data)
 
 
 @extend_schema(tags=["issues"])

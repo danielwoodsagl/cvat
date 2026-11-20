@@ -39,9 +39,61 @@ export async function returnFlaggedFrames(jobId: number, assigneeId: number | nu
 export interface UserOption {
     id: number;
     username: string;
+    first_name?: string;
+    last_name?: string;
 }
 
 export async function searchUsers(search: string): Promise<UserOption[]> {
     const users = await core.users.get({ limit: 20, is_active: true, ...(search ? { search } : {}) });
-    return users.map((user: { id: number; username: string }) => ({ id: user.id, username: user.username }));
+    return users.map((user: { id: number; username: string; firstName?: string; lastName?: string }) => ({
+        id: user.id,
+        username: user.username,
+        first_name: user.firstName,
+        last_name: user.lastName,
+    }));
+}
+
+export interface JobPeople {
+    job_id: number;
+    annotator: UserOption | null;
+    reviewer: UserOption | null;
+}
+
+export async function getJobPeople(jobIds: number[]): Promise<Record<number, JobPeople>> {
+    if (!jobIds.length) return {};
+    const response = await core.server.request(url('/jobs/people'), {
+        method: 'GET',
+        params: { ids: jobIds.join(',') },
+    }) as { data: JobPeople[] };
+    return Object.fromEntries(response.data.map((people) => [people.job_id, people]));
+}
+
+export async function setJobPeople(
+    jobId: number,
+    changes: { annotator?: number | null; reviewer?: number | null },
+): Promise<JobPeople> {
+    const response = await core.server.request(url(`/jobs/${jobId}/people`), {
+        method: 'PATCH',
+        data: changes,
+    }) as { data: JobPeople };
+    return response.data;
+}
+
+export async function sendToReview(jobId: number, reviewerId?: number | null): Promise<WorkflowJob> {
+    const response = await core.server.request(url(`/jobs/${jobId}/send_to_review`), {
+        method: 'POST',
+        data: reviewerId === undefined ? {} : { reviewer: reviewerId },
+    }) as { data: WorkflowJob };
+    return response.data;
+}
+
+export function displayName(user: UserOption): string {
+    const full = [user.first_name, user.last_name].filter(Boolean).join(' ');
+    return full ? `${full} (${user.username})` : user.username;
+}
+
+export function initials(user: UserOption): string {
+    const parts = [user.first_name, user.last_name].filter((part): part is string => !!part);
+    const source = parts.length ? parts : user.username.split(/[._\-\s@]+/).filter(Boolean);
+    return source.slice(0, 2).map((part) => part[0].toUpperCase()).join('') || '?';
 }
